@@ -1,0 +1,6 @@
+.vscode/
+*env/
+logs/
+data/user.ini
+data/dates.ini
+
