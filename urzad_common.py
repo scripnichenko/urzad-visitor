@@ -18,7 +18,6 @@ app_config.read('urzad.conf')
 page_main = app_config['common']['page_main']
 page_login = app_config['common']['page_login']
 page_lock = app_config['common']['page_lock']
-page_form = app_config['common']['page_form']
 page_pol = dict(map(
     lambda n: (str(n), (app_config['loc_' + str(n)]['city'], app_config['loc_' + str(n)]['page_pol'])),
     range(2, 6)

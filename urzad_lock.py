@@ -59,8 +59,8 @@ def lock_slot(session, loc, city, date, time):
         if slot_id not in global_locked_slots:
             logger.info(f'A slot found: {slot_id} Sending a email with URL...')
             global_locked_slots.append(slot_id)
-            url = page_form + slot_id + '/1'
-            send_mail(city, date, time, url)
+            page_slot = app_config['loc_'+loc]['page_form']
+            send_mail(city, date, time, page_slot.replace('$slot$', slot_id))
         else:
             logger.info(f'A slot found: {slot_id} and was already locked by me. Check email!!!')
 
