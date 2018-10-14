@@ -9,11 +9,11 @@ gmail_user = user_config['gmail']['email']
 gmail_password = user_config['gmail']['password']
 
 
-def send_mail(url):
+def send_mail(city, date, time, url):
     sent_from = gmail_user
     to = ['***REMOVED***']
     subject = 'Urzad Bot: I was able to lock a slot for you. Hurry up!!!'
-    body = f'Here is the URL for you my master: {url}'
+    body = f'I\'ve reserved a slot on date {date} at {time} in {city}.\nHere is the URL for you, my master: {url}'
 
     msg = MIMEText(body)
     msg['Subject'] = subject

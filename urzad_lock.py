@@ -60,7 +60,7 @@ def lock_slot(session, loc, city, date, time):
             logger.info(f'A slot found: {slot_id} Sending a email with URL...')
             global_locked_slots.append(slot_id)
             url = page_form + slot_id + '/1'
-            send_mail(url)
+            send_mail(city, date, time, url)
         else:
             logger.info(f'A slot found: {slot_id} and was already locked by me. Check email!!!')
 
