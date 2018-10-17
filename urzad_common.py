@@ -16,12 +16,20 @@ app_config = configparser.ConfigParser()
 app_config.read('urzad.conf')
 
 page_main = app_config['common']['page_main']
-page_login = app_config['common']['page_login']
-page_lock = app_config['common']['page_lock']
-page_pol = dict(map(
-    lambda n: (str(n), (app_config['loc_' + str(n)]['city'], app_config['loc_' + str(n)]['page_pol'])),
-    range(2, 6)
-))
+page_login = page_main + app_config['common']['page_login']
+page_lock = page_main + app_config['common']['page_lock']
+
+page_pol = page_main + app_config['template']['page_pol']
+page_slot = page_main + app_config['template']['page_slot']
+page_comfirm = page_main + app_config['template']['page_confirm']
+
+
+def make_page_pol(n):
+    locn = 'loc_' + n
+    return (app_config[locn]['city'], page_pol.format(app_config[locn]['queue'], app_config[locn]['city_id']))
+
+
+all_page_pol = dict(map(lambda n: (str(n), make_page_pol(str(n))), range(2, 6)))
 
 user_config = configparser.ConfigParser()
 user_config.read('data/user.ini')
@@ -40,9 +48,9 @@ def attempt(func, name, logger, times=25):  # TODO move logger to <some> parent 
 
 
 def check_is_logged_in(response, logger):  # TODO move logger to <some> parent class when
-    page_title = re.findall('<title>.*?</title>', response.text)[0]
-    logger.debug(page_title)
-    if 'Moje rezerwacje' not in page_title:
+    title = re.findall('<title>.*?</title>', response.text)[0]
+    logger.debug(title)
+    if 'Moje rezerwacje' not in title:
         logger.error("Something wrong with your login")
         raise RuntimeError("Not logged in")
     else:
