@@ -1,9 +1,9 @@
+import configparser
+import json
 import logging
 import logging.config
-import threading
 import re
-import json
-import configparser
+import threading
 
 import requests
 import urllib3

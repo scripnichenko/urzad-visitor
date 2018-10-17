@@ -1,15 +1,17 @@
+import configparser
+import json
 import logging
 import logging.config
-import threading
 import re
-import json
-import configparser
+import threading
 
+import AdvancedHTMLParser
 import requests
 import urllib3
-import AdvancedHTMLParser
 
-from urzad_common import *
+from urzad_common import (all_page_pol, app_config, attempt,
+                          check_is_logged_in, dates_config, page_lock,
+                          page_login, page_main, page_slot, user_config)
 from urzad_gmail_sender import send_mail
 
 logger = logging.getLogger('urzadDate')
