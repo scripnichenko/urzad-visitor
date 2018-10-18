@@ -35,15 +35,15 @@ def parse_available_dates():
         # 2a. Check if logged in successfully
         uv.check_is_logged_in(login_response)
 
-        # 3. Parse dates and store to Config :)
+        # 3. Parse dates and store to config
         dates = {}
-        for loc, (city, page) in uv.all_page_pol.items():
-            logger.debug(f"Parsing dates for location {loc}: {city}...")
+        for (loc, ul) in uv.all_urzad_locations.items():
+            logger.debug(f"Parsing dates for location {loc}: {ul.city_name}...")
 
-            last_date = get_last_date_from_page(session.get(page, cookies={'config[currentLoc]': loc, 'AKIS': session.cookies['AKIS']}, verify=False))
-            logger.debug(f"The last date for location {loc}: {city} is === {last_date} ===")
+            last_date = get_last_date_from_page(session.get(ul.page_pol, cookies={'config[currentLoc]': loc, 'AKIS': session.cookies['AKIS']}, allow_redirects=True, verify=False))
+            logger.debug(f"The last date for location {loc}: {ul.city_name} is === {last_date} ===")
 
-            dates['loc_'+loc] = {'city': city, 'date': last_date}
+            dates['loc_'+loc] = {'city': ul.city_name, 'date': last_date}
 
         uv.save_dates_config(dates)
         logger.info("Parsing done. Config saved")

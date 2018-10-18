@@ -49,49 +49,51 @@ def try_lock_slots():
         # 2b. Read dates_config
         dates_config = uv.read_dates_config()
 
-        def lock_slot(session, loc, city, date, time):
-            city_id, queue = uv.city_id_and_queue(loc)
+        def lock_slot(session, loc, ul, date, time):
+            # city_id, queue = uv.city_id_and_queue(loc)
 
-            logger.debug(f"Going to lock slot {time} for {loc}: {city}...")
+            logger.debug(f"Going to lock slot {time} for {loc}: {ul.city_name}...")
             response = session.post(
                 uv.page_lock,
                 cookies={'config[currentLoc]': loc, 'AKIS': session.cookies['AKIS']},
                 headers={'X-Requested-With': 'XMLHttpRequest'},
-                data={'time': time, 'queue': queue},
+                data={'time': time, 'queue': ul.city_queue},
                 verify=False
             )
-            logger.debug(f"Lock response for slot {time} for {loc}: {city} is === {response.text} ===")
+            logger.debug(f"Lock response for slot {time} for {loc}: {ul.city_name} is === {response.text} ===")
             if "OK " in response.text:
                 slot = response.text[3:]
                 if slot not in global_locked_slots:
                     logger.info(f'A slot found: {slot} Sending a email with URL...')
                     global_locked_slots.append(slot)
-                    uv.send_mail(city, date, time, uv.page_slot.format(slot, city_id))
+                    # TODO automate it!
+                    uv.send_mail(ul.city_name, date, time, ul.page_slot.format(slot))
                 else:
                     logger.info(f'A slot found: {slot} and was already locked by me. Check email!!!')
 
-        def get_slots(session, loc, city, page):
+        def get_slots(session, loc, ul):
             date = dates_config['loc_'+loc]['date']
 
-            logger.debug(f"Get available slots for {loc}: {city} and date {date}...")
+            logger.debug(f"Get available slots for {loc}: {ul.city_name} and date {date}...")
             slots = get_available_slots(
                 session.get(
-                    page + date,
+                    ul.page_pol + date,
                     cookies={'config[currentLoc]': loc, 'AKIS': session.cookies['AKIS']},
                     headers={'X-Requested-With': 'XMLHttpRequest'},
                     verify=False),
                 date)
-            logger.debug(f"Available slots for {loc}: {city} are === {slots} ===")
+            logger.debug(f"Available slots for {loc}: {ul.city_name} are === {slots} ===")
 
             for time in slots:
-                t = threading.Thread(target=lambda: lock_slot(session, loc, city, date, time), name=f"SearchSlots-{loc}-{time}")
+                t = threading.Thread(target=lambda: lock_slot(session, loc, ul, date, time), name=f"SearchSlots-{loc}-{time}")
                 t.start()
 
         # 3. Parse dates and store to Config :)
         while True:
             threads = []
-            for loc, (city, page) in uv.all_page_pol.items():
-                t = threading.Thread(target=lambda: get_slots(session, loc, city, page), name=f"SearchSlots-{loc}")
+            # for loc, (city, page) in uv.all_page_pol.items():
+            for (loc, ul) in uv.all_urzad_locations.items():
+                t = threading.Thread(target=lambda: get_slots(session, loc, ul), name=f"SearchSlots-{loc}")
                 t.start()
                 threads.append(t)
 
