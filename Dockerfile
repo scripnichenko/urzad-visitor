@@ -18,7 +18,8 @@ RUN python3 -m pip install -r requirements.txt
 
 ADD . /opt/app
 
-# CMD ["python3", "-m", "urzad-visitor"]
+# CMD ["python3", "-m", "urzad_command date"]
+# CMD ["python3", "-m", "urzad_command lock"]
 
 # Using pipenv:
 #RUN python3 -m pip install pipenv

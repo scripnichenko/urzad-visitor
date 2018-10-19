@@ -1,7 +1,6 @@
 import configparser
 import logging
 import logging.config
-import re
 import smtplib
 from email.mime.text import MIMEText
 
@@ -10,14 +9,16 @@ logging.config.fileConfig('logging.conf')  # , disable_existing_loggers=False
 
 class UrzadLocation:
 
-    def __init__(self, n, app_config, page_main):
+    def __init__(self, loc, app_config, page_main):
         app_config_t = app_config['template']
-        app_config_n = app_config['loc_' + n]
+        app_config_n = app_config['branch_' + loc]
 
+        city_loc = app_config_n['city_loc']
         city_name = app_config_n['city_name']
         city_id = app_config_n['city_id']
         city_queue = app_config_n['city_queue']
 
+        self.city_loc = city_loc
         self.city_name = city_name
         self.city_id = city_id
         self.city_queue = city_queue
@@ -42,11 +43,11 @@ class UrzadVisitor:
         self.page_login = self.page_main + self._app_config['common']['page_login']
         self.page_lock = self.page_main + self._app_config['common']['page_lock']
 
-        locations_list = self._app_config['common']['locations'].split(",")
-        self.all_urzad_locations = {
-            n: UrzadLocation(n, self._app_config, self.page_main)
-            for n in locations_list
-        }
+        locations_list = self._app_config['common']['branches'].split(',')
+        self.all_urzad_locations = [
+            UrzadLocation(loc, self._app_config, self.page_main)
+            for loc in locations_list
+        ]
 
         self.user_email = self._user_config['user']['email']
         self.user_password = self._user_config['user']['password']
@@ -54,32 +55,13 @@ class UrzadVisitor:
         self._gmail_user = self._user_config['gmail']['email']
         self._gmail_password = self._user_config['gmail']['password']
 
-    def attempt(self, func, name, times=5):
-        for n in range(times):
-            try:
-                return func()
-            except Exception as err:
-                self._logger.error(f"An exception happened during execution function '{name}': {err}")
-                self._logger.debug(f"Another {n} attempt for '{name}'...")
-                pass
-        raise err
-
-    def check_is_logged_in(self, response):
-        title = re.findall('<title>.*?</title>', response.text)[0]
-        self._logger.debug(title)
-        if 'Moje rezerwacje' not in title:
-            self._logger.error("Something wrong with your login")
-            raise RuntimeError("Not logged in")
-        else:
-            self._logger.info("Successfully logged in. Go ahead...")
-
     def save_dates_config(self, dates):
         self._dates_config.read_dict(dates)
-        with open("data/dates.ini", 'w+') as configfile:
+        with open('data/dates.ini', 'w+') as configfile:
             self._dates_config.write(configfile)
 
     def read_dates_config(self):
-        self._dates_config.read("data/dates.ini")
+        self._dates_config.read('data/dates.ini')
         return self._dates_config
 
     def send_mail(self, city, date, time, url):
@@ -91,7 +73,7 @@ class UrzadVisitor:
         msg = MIMEText(body)
         msg['Subject'] = subject
         msg['From'] = sent_from
-        msg['To'] = ", ".join(to)
+        msg['To'] = ', '.join(to)
 
         try:
             server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
