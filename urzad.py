@@ -64,11 +64,11 @@ class Urzad:
         self._dates_config.read('data/dates.ini')
         return self._dates_config
 
-    def send_mail(self, city, date, time, url):
+    def send_mail(self, city, time, url):
         sent_from = self._gmail_user
         to = [self._gmail_user]
         subject = 'Urzad Bot: I was able to lock a slot for you. Hurry up!!!'
-        body = f'I\'ve reserved a slot on date {date} at {time} in {city}.\nHere is the URL for you, my master: {url}'
+        body = f'I\'ve reserved a slot {time} in {city}.\nHere is the URL for you, my master: {url}'
 
         msg = MIMEText(body)
         msg['Subject'] = subject

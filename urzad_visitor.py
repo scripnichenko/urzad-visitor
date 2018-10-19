@@ -91,11 +91,55 @@ def lock_available_slots():
         # for testing purposes:
         # slots_found = [date + ' ' + a + ':00' for a in [
         #     '10:00', '10:20', '10:40',
-        #     '11:00', '11:20', '11:40'
+        #     '11:00', '11:20', '11:40',
         #     '12:00', '12:20', '12:40',
         #     '12:00', '13:20', '13:40']]
         # print(slots_found)
         return slots_found
+
+    def lock_slot(session, ul, time):
+        logger.debug(f'Going to lock slot {time} for {ul.city_loc}: {ul.city_name}...')
+        response = session.post(
+            uv.page_lock,
+            cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+            headers={'X-Requested-With': 'XMLHttpRequest'},
+            data={'time': time, 'queue': ul.city_queue},
+            verify=False
+        )
+        logger.debug(f'Lock response for slot {time} for {ul.city_loc}: {ul.city_name} is === {response.text} ===')
+        if 'OK ' in response.text:
+            slot = response.text[3:]
+            if slot not in locked_slots:
+                logger.info(f'A slot found: {slot} Sending a email with URL...')
+                locked_slots.append(slot)
+                # TODO automate it! (later)
+                uv.send_mail(ul.city_name, time, ul.page_slot.format(slot))
+            else:
+                logger.info(f'A slot found: {slot} and was already locked by me. Check email!!!')
+
+    def search_slots(session, ul, date):
+        while True: # TDOO add condition to exit the endless loop
+            logger.debug(f'Search available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
+            
+            slots_response = session.get(
+                    ul.page_pol + date,
+                    cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+                    headers={'X-Requested-With': 'XMLHttpRequest'},
+                    verify=False
+            )
+            slots = get_available_slots(slots_response, date)
+            
+            logger.debug(f'Available slots for {ul.city_loc}: {ul.city_name} are === {slots} ===')
+
+            threads = []
+            for time in slots:
+                t = threading.Thread(target=lambda: lock_slot(session, ul, time), name=f'TSlot-{ul.city_loc}-{time[11:16]}')
+                t.start()
+                threads.append(t)
+            
+            for t in threads:
+                logger.debug(f'...joining {t}... ')
+                t.join()
 
     with requests.Session() as session:
         uv = urzad.Urzad()
@@ -116,56 +160,20 @@ def lock_available_slots():
         # 2b. Read dates_config
         dates_config = uv.read_dates_config()
 
-        def lock_slot(session, ul, date, time):
-            logger.debug(f'Going to lock slot {date} {time} for {ul.city_loc}: {ul.city_name}...')
-            response = session.post(
-                uv.page_lock,
-                cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
-                headers={'X-Requested-With': 'XMLHttpRequest'},
-                data={'time': time, 'queue': ul.city_queue},
-                verify=False
-            )
-            logger.debug(f'Lock response for slot {date} {time} for {ul.city_loc}: {ul.city_name} is === {response.text} ===')
-            if 'OK ' in response.text:
-                slot = response.text[3:]
-                if slot not in locked_slots:
-                    logger.info(f'A slot found: {slot} Sending a email with URL...')
-                    locked_slots.append(slot)
-                    # TODO automate it! later
-                    uv.send_mail(ul.city_name, date, time, ul.page_slot.format(slot))
-                else:
-                    logger.info(f'A slot found: {slot} and was already locked by me. Check email!!!')
-
-        def get_slots(session, ul):
+        # 3. Parse dates and store to Config :)
+        threads = []
+        for ul in uv.all_urzad_locations:
             date = dates_config['branch_'+ul.city_loc]['date']
 
-            logger.debug(f'Get available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
-            slots = get_available_slots(
-                session.get(
-                    ul.page_pol + date,
-                    cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
-                    headers={'X-Requested-With': 'XMLHttpRequest'},
-                    verify=False),
-                date)
-            logger.debug(f'Available slots for {ul.city_loc}: {ul.city_name} are === {slots} ===')
+            t = threading.Thread(target=lambda: search_slots(session, ul, date), name=f'TSlot-{ul.city_loc}-srch')
+            t.start()
+            threads.append(t)
 
-            for time in slots:
-                t = threading.Thread(target=lambda: lock_slot(session, ul, date, time), name=f'SearchSlots-{ul.city_loc}-{time}')
-                t.start()
+        for t in threads:
+            logger.debug(f'...joining {t}... ')
+            t.join()
 
-        # 3. Parse dates and store to Config :)
-        while True:
-            threads = []
-            for ul in uv.all_urzad_locations:
-                t = threading.Thread(target=lambda: get_slots(session, ul), name=f'SearchSlots-{ul.city_loc}')
-                t.start()
-                threads.append(t)
-
-            for t in threads:
-                logger.debug(f'...joining {t}... ')
-                t.join()
-
-            threads.clear()
+        threads.clear()
 
     logger.info('Session closed')
 
