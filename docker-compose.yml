@@ -1,8 +1,14 @@
-version: '2.1'
+version: '2.2'
 
 services:
   urzad-visitor:
-    image: urzad-visitor
+    image: urzad-visitor:latest
     build: .
-    ports:
-      - 5000:5000
+    # ports:
+    #   - 5000:5000
+    volumes:
+      - ./logs:/opt/app/logs
+      - ./data:/opt/app/data
+    entrypoint:
+      - python3
+      - urzad_visitor.py

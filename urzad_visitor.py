@@ -12,8 +12,11 @@ import urzad
 
 urllib3.disable_warnings()
 
+logging.config.fileConfig('logging.conf')  # , disable_existing_loggers=False
 
-def attempt(func, name, logger, times=5):
+logger = logging.getLogger('urzadVisitor')
+
+def attempt(func, name, times=5):
     for n in range(times):
         try:
             return func()
@@ -24,7 +27,7 @@ def attempt(func, name, logger, times=5):
     raise err
 
 
-def check_is_logged_in(response, logger):
+def check_is_logged_in(response):
     title = re.findall('<title>.*?</title>', response.text)[0]
     logger.debug(title)
     if 'Moje rezerwacje' not in title:
@@ -35,8 +38,6 @@ def check_is_logged_in(response, logger):
 
 
 def parse_available_dates():
-    logger = logging.getLogger('urzadDate')
-
     def get_last_date_from_page(response):
         dates_found = re.findall('var dateEvents = \\[{.*?}\\]', response.text)[0][16:]
         dates_json = json.loads(dates_found)
@@ -52,10 +53,10 @@ def parse_available_dates():
         # 2. visit login page (post data)
         logger.info('Loggging in...')
         data = {'data[User][email]': uv.user_email, 'data[User][password]': uv.user_password}
-        login_response = attempt(lambda: session.post(uv.page_login, data=data, verify=False), 'login', logger)
+        login_response = attempt(lambda: session.post(uv.page_login, data=data, verify=False), 'login')
 
         # 2a. Check if logged in successfully
-        check_is_logged_in(login_response, logger)
+        check_is_logged_in(login_response)
 
         # 3. Parse dates and store to config
         dates = {}
@@ -80,8 +81,7 @@ def parse_available_dates():
     logger.info('Session closed')
 
 
-def lock_available_slots():
-    logger = logging.getLogger('urzadLock')
+def get_available_slots():
     locked_slots = []
 
     def get_available_slots(response, date):
@@ -128,7 +128,7 @@ def lock_available_slots():
                     cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
                     headers={'X-Requested-With': 'XMLHttpRequest'},
                     verify=False
-            ), 'page_pol', logger)
+            ), 'page_pol')
             slots = get_available_slots(slots_response, date)
             
             logger.debug(f'Available slots for {ul.city_loc}: {ul.city_name} are === {slots} ===')
@@ -154,10 +154,10 @@ def lock_available_slots():
         logger.info('Loggging in...')
 
         data = {'data[User][email]': uv.user_email, 'data[User][password]': uv.user_password}
-        login_response = attempt(lambda: session.post(uv.page_login, data=data, verify=False), 'login', logger)
+        login_response = attempt(lambda: session.post(uv.page_login, data=data, verify=False), 'login')
 
         # 2a. Check if logged in successfully
-        check_is_logged_in(login_response, logger)
+        check_is_logged_in(login_response)
 
         # 2b. Read dates_config
         dates_config = uv.read_dates_config()
@@ -181,12 +181,5 @@ def lock_available_slots():
 
 
 if __name__ == '__main__':
-    import sys
-    if len(sys.argv) >= 2:
-        arg = sys.argv[1]
-        if arg == 'date':
-            parse_available_dates()
-        elif arg == 'lock':
-            lock_available_slots()
-    else:
-        print('Use extra argument "date" or "lock"')
+    parse_available_dates()
+    get_available_slots()
