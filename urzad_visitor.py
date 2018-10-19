@@ -42,7 +42,7 @@ def parse_available_dates():
         return dates_json[-1]['date']
 
     with requests.Session() as session:
-        uv = urzad.UrzadVisitor()
+        uv = urzad.Urzad()
         session.headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:62.0) Gecko/20100101 Firefox/62.0'}
 
         # 1. visit main page (to set up cookies in the session ?)
@@ -98,7 +98,7 @@ def lock_available_slots():
         return slots_found
 
     with requests.Session() as session:
-        uv = urzad.UrzadVisitor()
+        uv = urzad.Urzad()
         session.headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:62.0) Gecko/20100101 Firefox/62.0'}
 
         # 1. visit main page (to set up cookies in the session ?)

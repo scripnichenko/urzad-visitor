@@ -28,7 +28,7 @@ class UrzadLocation:
         self.page_confirm = page_main + app_config_t['page_confirm'].format(city_id, '{}')  # there is one {} for 'slot'
 
 
-class UrzadVisitor:
+class Urzad:
     _logger = logging.getLogger(__name__)
 
     _app_config = configparser.ConfigParser()
