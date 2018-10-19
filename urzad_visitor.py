@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import threading
+from time import sleep
 
 import AdvancedHTMLParser
 import requests
@@ -118,15 +119,16 @@ def lock_available_slots():
                 logger.info(f'A slot found: {slot} and was already locked by me. Check email!!!')
 
     def search_slots(session, ul, date):
-        while True: # TDOO add condition to exit the endless loop
+        while True: # TODO add condition to exit the endless loop
+            sleep(1)
             logger.debug(f'Search available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
             
-            slots_response = session.get(
+            slots_response = attempt(lambda: session.get(
                     ul.page_pol + date,
                     cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
                     headers={'X-Requested-With': 'XMLHttpRequest'},
                     verify=False
-            )
+            ), 'page_pol', logger)
             slots = get_available_slots(slots_response, date)
             
             logger.debug(f'Available slots for {ul.city_loc}: {ul.city_name} are === {slots} ===')

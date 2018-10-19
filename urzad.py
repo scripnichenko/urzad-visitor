@@ -29,44 +29,44 @@ class UrzadLocation:
 
 
 class Urzad:
-    _logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
 
-    _app_config = configparser.ConfigParser()
-    _user_config = configparser.ConfigParser()
-    _dates_config = configparser.ConfigParser()
+    app_config = configparser.ConfigParser()
+    user_config = configparser.ConfigParser()
+    dates_config = configparser.ConfigParser()
 
     def __init__(self):
-        self._app_config.read('urzad.conf')
-        self._user_config.read('data/user.ini')
+        self.app_config.read('urzad.conf')
+        self.user_config.read('data/user.ini')
 
-        self.page_main = self._app_config['common']['page_main']
-        self.page_login = self.page_main + self._app_config['common']['page_login']
-        self.page_lock = self.page_main + self._app_config['common']['page_lock']
+        self.page_main = self.app_config['common']['page_main']
+        self.page_login = self.page_main + self.app_config['common']['page_login']
+        self.page_lock = self.page_main + self.app_config['common']['page_lock']
 
-        locations_list = self._app_config['common']['branches'].split(',')
+        locations_list = self.app_config['common']['branches'].split(',')
         self.all_urzad_locations = [
-            UrzadLocation(loc, self._app_config, self.page_main)
+            UrzadLocation(loc, self.app_config, self.page_main)
             for loc in locations_list
         ]
 
-        self.user_email = self._user_config['user']['email']
-        self.user_password = self._user_config['user']['password']
-
-        self._gmail_user = self._user_config['gmail']['email']
-        self._gmail_password = self._user_config['gmail']['password']
+        self.user_email = self.user_config['user']['email']
+        self.user_password = self.user_config['user']['password']
 
     def save_dates_config(self, dates):
-        self._dates_config.read_dict(dates)
+        self.dates_config.read_dict(dates)
         with open('data/dates.ini', 'w+') as configfile:
-            self._dates_config.write(configfile)
+            self.dates_config.write(configfile)
 
     def read_dates_config(self):
-        self._dates_config.read('data/dates.ini')
-        return self._dates_config
+        self.dates_config.read('data/dates.ini')
+        return self.dates_config
 
     def send_mail(self, city, time, url):
-        sent_from = self._gmail_user
-        to = [self._gmail_user]
+        gmail_user = self.user_config['gmail']['email']
+        gmail_password = self.user_config['gmail']['password']
+
+        sent_from = gmail_user
+        to = [gmail_user]
         subject = 'Urzad Bot: I was able to lock a slot for you. Hurry up!!!'
         body = f'I\'ve reserved a slot {time} in {city}.\nHere is the URL for you, my master: {url}'
 
@@ -78,7 +78,7 @@ class Urzad:
         try:
             server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
             server.ehlo()
-            server.login(self._gmail_user, self._gmail_password)
+            server.login(gmail_user, gmail_password)
             server.send_message(msg)
             server.close()
 
