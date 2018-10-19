@@ -9,7 +9,7 @@ import urzad
 
 urllib3.disable_warnings()
 
-logger = logging.getLogger('urzadDate')
+logger = logging.getLogger('urzadLock')
 
 global_locked_slots = []
 
