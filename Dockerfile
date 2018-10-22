@@ -3,7 +3,7 @@
 # OS Support also exists for jessie & stretch (slim and full).
 # See https://hub.docker.com/r/library/python/ for all supported Python
 # tags from Docker Hub.
-FROM python:alpine
+FROM python:3-alpine
 
 LABEL Name=urzad-visitor Version=0.0.1
 EXPOSE 5000
@@ -14,12 +14,12 @@ WORKDIR /opt/app
 RUN python3 -m pip install --upgrade pip
 
 ADD requirements.txt /opt/app/requirements.txt
-RUN python3 -m pip install -r requirements.txt
+RUN python3 -m pip --no-cache-dir install -r requirements.txt
 
 ADD . /opt/app
 
-# CMD ["python3", "-m", "urzad_visitor date"]
-# CMD ["python3", "-m", "urzad_visitor lock"]
+CMD ["python3", "urzad_visitor.py"]
+# CMD ["python3", "-m", "urzad_visitor"]
 
 # Using pipenv:
 #RUN python3 -m pip install pipenv

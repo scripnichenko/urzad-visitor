@@ -82,6 +82,6 @@ class Urzad:
             server.send_message(msg)
             server.close()
 
-            print('Email sent!')
+            self.logger.info('Email sent!')
         except Exception as e:
-            print('Something went wrong...' + str(e))
+            self.logger.debug('Something went wrong...' + str(e))

@@ -4,11 +4,14 @@ services:
   urzad-visitor:
     image: urzad-visitor:latest
     build: .
+    container_name: urzad-visitor-script
+    hostname: urzad-visitor
+    # restart: always
     # ports:
     #   - 5000:5000
     volumes:
       - ./logs:/opt/app/logs
       - ./data:/opt/app/data
-    entrypoint:
+    command:
       - python3
       - urzad_visitor.py
