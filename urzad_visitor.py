@@ -1,12 +1,18 @@
 import json
 import logging
+import logging.config
 import re
+import shutil
+import smtplib
 import threading
+from email.mime.text import MIMEText
 from time import sleep
 
 import AdvancedHTMLParser
+import pytesseract
 import requests
 import urllib3
+from PIL import Image
 
 import urzad
 
@@ -15,6 +21,10 @@ urllib3.disable_warnings()
 logging.config.fileConfig('logging.conf')  # , disable_existing_loggers=False
 
 logger = logging.getLogger('urzadVisitor')
+
+# Some global stuff :)
+lock = threading.RLock()
+locked_slots = []
 
 
 def attempt(func, name, times=5):
@@ -26,6 +36,21 @@ def attempt(func, name, times=5):
             logger.debug(f'Another {n} attempt for "{name}"...')
             pass
     raise err
+
+
+def login_and_check(uv, session):
+    def check_is_logged_in(response):
+        title = re.findall('<title>.*?</title>', response.text)[0]
+        logger.debug(title)
+        if 'Moje rezerwacje' not in title:
+            logger.error('Something wrong with your login')
+            raise RuntimeError('Not logged in')
+        else:
+            logger.info('Successfully logged in. Go ahead...')
+
+    logger.info('Loggging in...')
+    data = {'data[User][email]': uv.user_email, 'data[User][password]': uv.user_password}
+    attempt(lambda: check_is_logged_in(session.post(uv.page_login, data=data, verify=False)), 'login_and_check')
 
 
 def parse_available_dates(uv, session):
@@ -57,9 +82,6 @@ def parse_available_dates(uv, session):
 
 
 def try_book_available_slots(uv, session, dates=None):
-    lock = threading.RLock()
-    locked_slots = []
-
     def get_available_slots(response, date):
         parser = AdvancedHTMLParser.AdvancedHTMLParser()
         parser.parseStr(response.text)
@@ -74,8 +96,6 @@ def try_book_available_slots(uv, session, dates=None):
 
     def lock_slot(session, ul, time):
         logger.debug(f'Going to lock slot {time} for {ul.city_loc}: {ul.city_name}...')
-        
-        # if not locked_slots:
 
         lock.acquire()
         logger.debug(f'>> lock_slot() locked by thread {threading.currentThread()}')
@@ -93,24 +113,22 @@ def try_book_available_slots(uv, session, dates=None):
                 if 'OK ' in response.text:
                     slot = response.text[3:]
                     if slot not in locked_slots:
-                        logger.info(f'A slot found: {slot} Sending a email with URL...')
+                        logger.info(f'A slot found: {slot}. Start filling the form...')
                         locked_slots.append(slot)
-                        # TODO automate it! (later)
-                        uv.send_mail(ul.city_name, time, ul.page_slot.format(slot))
+                        fill_the_form(uv, ul, slot, time, session)
                     else:
                         logger.info(f'A slot found: {slot} and was already locked by me. Check email!!!')
             except Exception:
                 pass
         else:
             logger.debug(f'Some slot is already locker. Passing by...')
-        
+
         logger.debug(f'>> lock_slot() released by thread {threading.currentThread()}')
         lock.release()
 
-
     def search_slots(session, ul, date):
-        while not locked_slots:  # TODO add condition to exit the loop if nothing locked
-            # sleep(1) # TODO avoid brute force a bit ?
+        while not locked_slots:  # TODO add condition to exit the loop if nothing locked ?
+            sleep(1)  # TODO avoid brute force a bit ?
             logger.debug(f'Search available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
 
             slots_response = attempt(lambda: session.get(
@@ -148,19 +166,115 @@ def try_book_available_slots(uv, session, dates=None):
         t.join()
 
 
-def login_and_check(uv, session):
-    def check_is_logged_in(response):
-        title = re.findall('<title>.*?</title>', response.text)[0]
-        logger.debug(title)
-        if 'Moje rezerwacje' not in title:
-            logger.error('Something wrong with your login')
-            raise RuntimeError('Not logged in')
-        else:
-            logger.info('Successfully logged in. Go ahead...')
+def fill_the_form(uv, ul, slot, time, session):
+    def solve_captcha(image_path):
+        initial_im = Image.open(image_path).convert('P')
+        cleaned_im = Image.new('P', initial_im.size, 255)
 
-    logger.info('Loggging in...')
-    data = {'data[User][email]': uv.user_email, 'data[User][password]': uv.user_password}
-    attempt(lambda: check_is_logged_in(session.post(uv.page_login, data=data, verify=False)), 'login_and_check')
+        for x in range(initial_im.size[1]):
+            for y in range(initial_im.size[0]):
+                pix = initial_im.getpixel((y, x))
+                if pix >= 2:
+                    cleaned_im.putpixel((y, x), 0)
+
+        return pytesseract.image_to_string(image=cleaned_im, config='--psm 7 -c tessedit_char_whitelist=0123456789')
+
+    # 1. Get captcha
+    logger.debug(f'Obtaining captcha...')
+    captcha_response = attempt(lambda: session.get(
+        uv.page_captcha,
+        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        stream=True,
+        verify=False
+    ), 'captcha')
+
+    captcha_path = 'data/captcha.png'
+    with open(captcha_path, 'wb') as out_file:
+        shutil.copyfileobj(captcha_response.raw, out_file)
+    captcha_response.close()
+    del captcha_response
+
+    logger.debug(f'Obtained! Solving captcha...')
+    captcha_text = solve_captcha(captcha_path)
+    logger.debug(f'Captcha solved: {captcha_text}. Posting')
+
+    # 2. Verify captcha
+    captcha_check_response = attempt(lambda: session.post(
+        uv.page_captcha + '/check',
+        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        headers={'X-Requested-With': 'XMLHttpRequest'},
+        data={'code': captcha_text},
+        verify=False
+    ), 'captcha_check')
+
+    if captcha_check_response.text != 'true':
+        logger.info(f'Captcha solved wrong: {captcha_text}... Start again!')
+        locked_slots.clear()
+        return
+
+    logger.info(f'Captcha solved, posting the user data...')
+
+    # 3. Fill user form
+    user_data = prepare_user_data(uv)
+    fill_form_response = attempt(lambda: session.post(
+        ul.page_slot.format(slot),
+        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        headers={'X-Requested-With': 'XMLHttpRequest'},
+        data=json.dumps(user_data),
+        verify=False
+    ), 'fill_form')
+
+    if fill_form_response.status_code != 200:
+        logger.info(f'Could not fill the form, status code: {fill_form_response.status_code}... Start again!')
+        locked_slots.clear()
+        return
+
+    logger.info(f'Data posted, confirming the link...')
+
+    # 3. Confirm form
+    confirm_form_response = attempt(lambda: session.get(
+        ul.page_confirm.format(slot),
+        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        allow_redirects=False,
+        verify=False
+    ), 'fill_form')
+
+    if confirm_form_response.status_code != 302 or slot not in confirm_form_response.headers['Location']:
+        logger.info(f'Could not confirm the form, status code: {confirm_form_response.status_code} (location: {confirm_form_response.headers["Location"]})... Start again!')
+        locked_slots.clear()
+        return
+
+    send_mail(uv, ul.city_name, time)
+
+
+def prepare_user_data(uv):
+    # TODO parse real user_data here
+    return [{'k':'v'}]
+
+def send_mail(uv, city, time):
+    gmail_user = uv.user_config['gmail']['email']
+    gmail_password = uv.user_config['gmail']['password']
+
+    sent_from = gmail_user
+    to = [gmail_user]
+    subject = 'Urzad Visitor has visited a location (successfully?)'
+    body = f'I hope I\'ve reserved a slot {time} in {city}.\nCheck on site.\nPrepare you documents in time in successfull case :)'
+
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = sent_from
+    msg['To'] = ', '.join(to)
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.ehlo()
+        server.login(gmail_user, gmail_password)
+        server.send_message(msg)
+        server.close()
+
+        logger.info('Email sent!')
+    except Exception as e:
+        logger.debug('Something went wrong...' + str(e))
 
 
 def main():

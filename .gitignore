@@ -4,4 +4,4 @@ __pycache__/
 logs/
 data/user.ini
 data/dates.ini
-
+data/captcha.png

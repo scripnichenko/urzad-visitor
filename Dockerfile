@@ -10,11 +10,18 @@ EXPOSE 5000
 
 WORKDIR /opt/app
 
+RUN apk update && \
+    apk add --no-cache zlib-dev jpeg-dev make gcc g++ zlib && \
+    apk add --no-cache libjpeg tesseract-ocr
+
 # upgrade pip (is cached after first time)
-RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install --upgrade setuptools
 
 ADD requirements.txt /opt/app/requirements.txt
 RUN python3 -m pip --no-cache-dir install -r requirements.txt
+
+RUN apk del zlib-dev jpeg-dev make gcc g++
 
 ADD . /opt/app
 

@@ -1,10 +1,4 @@
 import configparser
-import logging
-import logging.config
-import smtplib
-from email.mime.text import MIMEText
-
-logging.config.fileConfig('logging.conf')  # , disable_existing_loggers=False
 
 
 class UrzadLocation:
@@ -30,9 +24,8 @@ class UrzadLocation:
     def __repr__(self):
         return f'{self.city_loc}: {self.city_name} ({self.city_queue}/{self.city_id})'
 
-class Urzad:
-    logger = logging.getLogger(__name__)
 
+class Urzad:
     app_config = configparser.ConfigParser()
     user_config = configparser.ConfigParser()
     dates_config = configparser.ConfigParser()
@@ -44,6 +37,7 @@ class Urzad:
         self.page_main = self.app_config['common']['page_main']
         self.page_login = self.page_main + self.app_config['common']['page_login']
         self.page_lock = self.page_main + self.app_config['common']['page_lock']
+        self.page_captcha = self.page_main + self.app_config['common']['page_captcha']
 
         all_locations_list = self.app_config['common']['locations'].split(',')
         if 'locations' in self.user_config['user'].keys():
@@ -68,28 +62,3 @@ class Urzad:
     def read_dates_config(self):
         self.dates_config.read('data/dates.ini')
         return self.dates_config
-
-    def send_mail(self, city, time, url):
-        gmail_user = self.user_config['gmail']['email']
-        gmail_password = self.user_config['gmail']['password']
-
-        sent_from = gmail_user
-        to = [gmail_user]
-        subject = 'Urzad Bot: I was able to lock a slot for you. Hurry up!!!'
-        body = f'I\'ve reserved a slot {time} in {city}.\nHere is the URL for you, my master: {url}'
-
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = sent_from
-        msg['To'] = ', '.join(to)
-
-        try:
-            server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-            server.ehlo()
-            server.login(gmail_user, gmail_password)
-            server.send_message(msg)
-            server.close()
-
-            self.logger.info('Email sent!')
-        except Exception as e:
-            self.logger.debug('Something went wrong...' + str(e))
