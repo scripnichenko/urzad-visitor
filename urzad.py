@@ -11,7 +11,7 @@ class UrzadLocation:
 
     def __init__(self, loc, app_config, page_main):
         app_config_t = app_config['template']
-        app_config_n = app_config['branch_' + loc]
+        app_config_n = app_config['location_' + loc]
 
         city_loc = app_config_n['city_loc']
         city_name = app_config_n['city_name']
@@ -27,6 +27,8 @@ class UrzadLocation:
         self.page_slot = page_main + app_config_t['page_slot'].format(city_id, '{}')  # there is one {} for 'slot'
         self.page_confirm = page_main + app_config_t['page_confirm'].format(city_id, '{}')  # there is one {} for 'slot'
 
+    def __repr__(self):
+        return f'{self.city_loc}: {self.city_name} ({self.city_queue}/{self.city_id})'
 
 class Urzad:
     logger = logging.getLogger(__name__)
@@ -43,11 +45,17 @@ class Urzad:
         self.page_login = self.page_main + self.app_config['common']['page_login']
         self.page_lock = self.page_main + self.app_config['common']['page_lock']
 
-        locations_list = self.app_config['common']['branches'].split(',')
+        all_locations_list = self.app_config['common']['locations'].split(',')
+        if 'locations' in self.user_config['user'].keys():
+            user_locations_list = self.user_config['user']['locations'].split(',')
+        else:
+            user_locations_list = all_locations_list
+
         self.all_urzad_locations = [
             UrzadLocation(loc, self.app_config, self.page_main)
-            for loc in locations_list
+            for loc in all_locations_list
         ]
+        self.user_urzad_locations = [u for u in self.all_urzad_locations if u.city_loc in user_locations_list]
 
         self.user_email = self.user_config['user']['email']
         self.user_password = self.user_config['user']['password']

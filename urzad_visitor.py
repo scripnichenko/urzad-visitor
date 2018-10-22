@@ -35,7 +35,7 @@ def parse_available_dates(uv, session):
         return dates_json[-1]['date']
 
     dates = {}
-    for ul in uv.all_urzad_locations:
+    for ul in uv.user_urzad_locations:
         logger.debug(f'Parsing dates for location {ul.city_loc}: {ul.city_name}...')
 
         pol_dates_response = attempt(lambda: session.get(
@@ -48,7 +48,7 @@ def parse_available_dates(uv, session):
 
         logger.debug(f'The last date for location {ul.city_loc}: {ul.city_name} is === {last_date} ===')
 
-        dates['branch_'+ul.city_loc] = {'city': ul.city_name, 'date': last_date}
+        dates['location_'+ul.city_loc] = {'city': ul.city_name, 'date': last_date}
 
     uv.save_dates_config(dates)
     logger.info('Parsing done. Config saved')
@@ -136,8 +136,8 @@ def try_book_available_slots(uv, session, dates=None):
     dates_config = dates or uv.read_dates_config()
 
     threads = []
-    for ul in uv.all_urzad_locations:
-        date = dates_config['branch_'+ul.city_loc]['date']
+    for ul in uv.user_urzad_locations:
+        date = dates_config['location_'+ul.city_loc]['date']
 
         t = threading.Thread(target=lambda: search_slots(session, ul, date), name=f'TSlot-{ul.city_loc}-srch')
         t.start()

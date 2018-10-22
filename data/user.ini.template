@@ -1,6 +1,7 @@
 [user]
 email=username@example.com
 password=123456
+locations=2,3,4
 
 [gmail]
 email=username@gmail.com
