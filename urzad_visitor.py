@@ -7,6 +7,7 @@ import smtplib
 import threading
 from email.mime.text import MIMEText
 from time import sleep
+from http.client import HTTPConnection
 
 import AdvancedHTMLParser
 import pytesseract
@@ -17,6 +18,7 @@ from PIL import Image
 import urzad
 
 urllib3.disable_warnings()
+HTTPConnection.debuglevel = 1
 
 logging.config.fileConfig('logging.conf')  # , disable_existing_loggers=False
 
