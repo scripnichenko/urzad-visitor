@@ -1,7 +1,17 @@
 [user]
 email=username@example.com
 password=123456
-locations=2,3,4
+locations=2,3,4                # possible values see in urzad.conf, refer to property "common.locations"
+
+[application]
+type=temporary                 # possible values: "temporary", "permanent"
+surname_name=Surname Name      #
+citizenship=Cosmopolitan       #
+birth_date=1981-12-31          # format: yyyy-mm-dd
+telephone=+48000000000         #
+passport=AA000000              #
+visa_karta=RP000000            #
+additional=spouse,child        # list. possible values: "spouse", "child", "children" or empty list
 
 [gmail]
 email=username@gmail.com

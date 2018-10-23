@@ -35,7 +35,7 @@ def attempt(func, name, times=5):
             logger.error(f'An exception happened during execution function "{name}": {err}')
             logger.debug(f'Another {n} attempt for "{name}"...')
             pass
-    raise err
+    raise RuntimeError(f'Cannot exec function {name} for {times} times. Giving up...')
 
 
 def login_and_check(uv, session):
@@ -219,8 +219,8 @@ def fill_the_form(uv, ul, slot, time, session):
     fill_form_response = attempt(lambda: session.post(
         ul.page_slot.format(slot),
         cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
-        headers={'X-Requested-With': 'XMLHttpRequest'},
-        data=json.dumps(user_data),
+        headers={'X-Requested-With': 'XMLHttpRequest', 'contentType': 'application/json; charset=utf-8'},
+        json=user_data,
         verify=False
     ), 'fill_form')
 
@@ -240,7 +240,8 @@ def fill_the_form(uv, ul, slot, time, session):
     ), 'fill_form')
 
     if confirm_form_response.status_code != 302 or slot not in confirm_form_response.headers['Location']:
-        logger.info(f'Could not confirm the form, status code: {confirm_form_response.status_code} (location: {confirm_form_response.headers["Location"]})... Start again!')
+        logger.info(f'Could not confirm the form, status code: {confirm_form_response.status_code} (location: {confirm_form_response.headers["Location"]})... ')
+        logger.info('Start again!')
         locked_slots.clear()
         return
 
@@ -248,8 +249,52 @@ def fill_the_form(uv, ul, slot, time, session):
 
 
 def prepare_user_data(uv):
-    # TODO parse real user_data here
-    return [{'k':'v'}]
+    
+    def name_value(name, value):
+        return {'name': name, 'value': value}
+
+    def app_additional_text(app_form, a):
+        if a == 'spouse':
+            return app_form.additional_spouse_text
+        elif a == 'child':
+            return app_form.additional_child_text
+        elif a == 'children':
+            return app_form.additional_children_text
+        else:
+            pass
+
+    app_form = urzad.ApplicationForm()
+    user_app = urzad.UserApplication()
+
+    if user_app.type == 'temporary':
+        type_text = app_form.type_temporary_text
+    elif user_app.type == 'permanent':
+        type_text = app_form.type_permanent_text
+    else:
+        raise ValueError(f'Wrong type "{user_app.type}" specified')
+
+    user_data = [
+        name_value(app_form.type, type_text),
+        name_value(app_form.surname_name, user_app.surname_name),
+        name_value(app_form.citizenship, user_app.citizenship),
+        name_value(app_form.birth_date, user_app.birth_date),
+        name_value(app_form.telephone, user_app.telephone),
+        name_value(app_form.passport, user_app.passport),
+        name_value(app_form.visa_karta, user_app.visa_karta),
+        name_value(app_form.gdpr, app_form.gdpr_text)
+    ]
+
+    if not user_app.additional_list:
+        additional_data_list = [name_value(app_form.additional, app_form.additional_empty_text)]
+    else:
+        additional_data_list = [name_value(app_form.additional, app_additional_text(app_form, a)) for a in user_app.additional_list]
+    
+    user_data.extend(additional_data_list)
+
+    logger.debug("=============== USER DATA")
+    logger.debug(json.dumps(user_data, ensure_ascii=False))
+    return user_data
+
 
 def send_mail(uv, city, time):
     gmail_user = uv.user_config['gmail']['email']
