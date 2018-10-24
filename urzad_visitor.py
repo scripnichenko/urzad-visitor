@@ -6,7 +6,7 @@ import shutil
 import smtplib
 import threading
 from email.mime.text import MIMEText
-from time import sleep
+from time import sleep, time
 from http.client import HTTPConnection
 
 import AdvancedHTMLParser
@@ -84,6 +84,11 @@ def parse_available_dates(uv, session):
 
 
 def try_book_available_slots(uv, session, dates=None):
+    start_time = time()
+
+    def time_is_over():
+        return time() - start_time >= uv.run_time
+
     def get_available_slots(response, date):
         parser = AdvancedHTMLParser.AdvancedHTMLParser()
         parser.parseStr(response.text)
@@ -129,7 +134,7 @@ def try_book_available_slots(uv, session, dates=None):
         lock.release()
 
     def search_slots(session, ul, date):
-        while not locked_slots:  # TODO add condition to exit the loop if nothing locked ?
+        while not locked_slots and not time_is_over():
             sleep(1)  # TODO avoid brute force a bit ?
             logger.debug(f'Search available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
 

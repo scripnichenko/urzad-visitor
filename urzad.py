@@ -42,6 +42,8 @@ class Urzad:
         self.page_lock = self.page_main + app_common['page_lock']
         self.page_captcha = self.page_main + app_common['page_captcha']
 
+        self.run_time = int(app_common['run_time'])
+
         all_locations_list = app_common['locations'].split(',')
         if 'locations' in user_common.keys():
             user_locations_list = user_common['locations'].split(',')
