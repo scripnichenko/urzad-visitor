@@ -1,6 +1,15 @@
 # Urzad Visitor
 This is an automate tool for helping booking slots in DUW online reservations system
 
+## Table of contents
+* [Set up configuration](#set-up-configuration)
+* [Run on local env](#run-on-local-env)
+  * [Setup local env](#setup-local-env)
+  * [Run local env](#run-local-env)
+* [Run as docker container (via docker\-compose)](#run-as-docker-container-via-docker-compose)
+  * [Setup docker](#setup-docker)
+  * [Run docker container](#run-docker-container)
+
 ## Set up configuration
 1. Create your own config file `data/user.ini` based on example `data/user.ini.template`
 
