@@ -139,7 +139,7 @@ def try_book_available_slots(uv, session, dates=None):
             logger.debug(f'Search available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
 
             slots_response = attempt(lambda: session.get(
-                ul.page_pol + date,
+                ul.page_pol,
                 cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
                 headers={'X-Requested-With': 'XMLHttpRequest'},
                 verify=False
