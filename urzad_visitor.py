@@ -32,10 +32,10 @@ locked_slots = []
 def attempt(func, name, times=5):
     for n in range(times):
         try:
+            logger.debug(f'{n+1} Attemt for "{name}"...')
             return func()
         except Exception as err:
             logger.error(f'An exception happened during execution function "{name}": {err}')
-            logger.debug(f'Another {n} attempt for "{name}"...')
             pass
     raise RuntimeError(f'Cannot exec function {name} for {times} times. Giving up...')
 
@@ -67,7 +67,7 @@ def parse_available_dates(uv, session):
 
         pol_dates_response = attempt(lambda: session.get(
             ul.page_pol,
-            cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+            cookies={'config[currentLoc]': ul.city_loc},
             allow_redirects=True,
             verify=False
         ), 'get_dates')
@@ -111,7 +111,7 @@ def try_book_available_slots(uv, session, dates=None):
             try:
                 response = session.post(
                     uv.page_lock,
-                    cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+                    cookies={'config[currentLoc]': ul.city_loc},
                     headers={'X-Requested-With': 'XMLHttpRequest'},
                     data={'time': time, 'queue': ul.city_queue},
                     verify=False
@@ -140,7 +140,7 @@ def try_book_available_slots(uv, session, dates=None):
 
             slots_response = attempt(lambda: session.get(
                 ul.page_pol,
-                cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+                cookies={'config[currentLoc]': ul.city_loc},
                 headers={'X-Requested-With': 'XMLHttpRequest'},
                 verify=False
             ), 'get_slots')
@@ -167,6 +167,7 @@ def try_book_available_slots(uv, session, dates=None):
         t = threading.Thread(target=lambda: search_slots(session, ul, date), name=f'TSlot-{ul.city_loc}-srch')
         t.start()
         threads.append(t)
+        sleep(1) # small delay before starting next thread
 
     for t in threads:
         logger.debug(f'...joining {t}... ')
@@ -190,7 +191,7 @@ def fill_the_form(uv, ul, slot, time, session):
     logger.debug(f'Obtaining captcha...')
     captcha_response = attempt(lambda: session.get(
         uv.page_captcha,
-        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        cookies={'config[currentLoc]': ul.city_loc},
         stream=True,
         verify=False
     ), 'captcha')
@@ -208,7 +209,7 @@ def fill_the_form(uv, ul, slot, time, session):
     # 2. Verify captcha
     captcha_check_response = attempt(lambda: session.post(
         uv.page_captcha + '/check',
-        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        cookies={'config[currentLoc]': ul.city_loc},
         headers={'X-Requested-With': 'XMLHttpRequest'},
         data={'code': captcha_text},
         verify=False
@@ -225,7 +226,7 @@ def fill_the_form(uv, ul, slot, time, session):
     user_data = prepare_user_data(uv)
     fill_form_response = attempt(lambda: session.post(
         ul.page_slot.format(slot),
-        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        cookies={'config[currentLoc]': ul.city_loc},
         headers={'X-Requested-With': 'XMLHttpRequest', 'contentType': 'application/json; charset=utf-8'},
         json=user_data,
         verify=False
@@ -241,7 +242,7 @@ def fill_the_form(uv, ul, slot, time, session):
     # 3. Confirm form
     confirm_form_response = attempt(lambda: session.get(
         ul.page_confirm.format(slot),
-        cookies={'config[currentLoc]': ul.city_loc, 'AKIS': session.cookies['AKIS']},
+        cookies={'config[currentLoc]': ul.city_loc},
         allow_redirects=False,
         verify=False
     ), 'fill_form')
