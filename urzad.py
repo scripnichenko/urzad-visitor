@@ -17,7 +17,8 @@ class UrzadLocation:
         self.city_id = city_id
         self.city_queue = city_queue
 
-        self.page_pol = page_main + app_config_t['page_pol'].format(city_id, city_queue)
+        self.page_terms = page_main + app_config_t['page_terms'].format(city_id, city_queue)
+        self.page_pol_date = page_main + app_config_t['page_pol_date'].format(city_id, city_queue, '{}')  # there is one {} for 'date'
         self.page_slot = page_main + app_config_t['page_slot'].format(city_id, '{}')  # there is one {} for 'slot'
         self.page_confirm = page_main + app_config_t['page_confirm'].format(city_id, '{}')  # there is one {} for 'slot'
 

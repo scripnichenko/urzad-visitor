@@ -66,7 +66,7 @@ def parse_available_dates(uv, session):
         logger.debug(f'Parsing dates for location {ul.city_loc}: {ul.city_name}...')
 
         pol_dates_response = attempt(lambda: session.get(
-            ul.page_pol,
+            ul.page_terms,
             cookies={'config[currentLoc]': ul.city_loc},
             allow_redirects=True,
             verify=False
@@ -139,7 +139,7 @@ def try_book_available_slots(uv, session, dates=None):
             logger.debug(f'Search available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
 
             slots_response = attempt(lambda: session.get(
-                ul.page_pol,
+                ul.page_pol_date.format(date),
                 cookies={'config[currentLoc]': ul.city_loc},
                 headers={'X-Requested-With': 'XMLHttpRequest'},
                 verify=False
@@ -167,7 +167,7 @@ def try_book_available_slots(uv, session, dates=None):
         t = threading.Thread(target=lambda: search_slots(session, ul, date), name=f'TSlot-{ul.city_loc}-srch')
         t.start()
         threads.append(t)
-        sleep(1) # small delay before starting next thread
+        sleep(1)  # small delay before starting next thread
 
     for t in threads:
         logger.debug(f'...joining {t}... ')
@@ -257,7 +257,7 @@ def fill_the_form(uv, ul, slot, time, session):
 
 
 def prepare_user_data(uv):
-    
+
     def name_value(name, value):
         return {'name': name, 'value': value}
 
@@ -296,7 +296,7 @@ def prepare_user_data(uv):
         additional_data_list = [name_value(app_form.additional, app_form.additional_empty_text)]
     else:
         additional_data_list = [name_value(app_form.additional, app_additional_text(app_form, a)) for a in user_app.additional_list]
-    
+
     user_data.extend(additional_data_list)
 
     logger.debug("=============== USER DATA")
