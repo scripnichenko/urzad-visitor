@@ -1,9 +1,10 @@
-import configparser
+from configparser import ConfigParser
+from typing import Dict
 
 
 class UrzadLocation:
 
-    def __init__(self, loc, app_config, page_main):
+    def __init__(self, loc: str, app_config: ConfigParser, page_main: str):
         app_config_t = app_config['template']
         app_config_n = app_config['location_' + loc]
 
@@ -22,14 +23,14 @@ class UrzadLocation:
         self.page_slot = page_main + app_config_t['page_slot'].format(city_id, '{}')  # there is one {} for 'slot'
         self.page_confirm = page_main + app_config_t['page_confirm'].format(city_id, '{}')  # there is one {} for 'slot'
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.city_loc}: {self.city_name} ({self.city_queue}/{self.city_id})'
 
 
 class Urzad:
-    app_config = configparser.ConfigParser()
-    user_config = configparser.ConfigParser()
-    dates_config = configparser.ConfigParser()
+    app_config: ConfigParser = ConfigParser()
+    user_config: ConfigParser = ConfigParser()
+    dates_config: ConfigParser = ConfigParser()
 
     def __init__(self):
         self.app_config.read('urzad.conf')
@@ -60,18 +61,18 @@ class Urzad:
         self.user_email = user_common['email']
         self.user_password = user_common['password']
 
-    def save_dates_config(self, dates):
+    def save_dates_config(self, dates: Dict[str, Dict[str, str]]):
         self.dates_config.read_dict(dates)
         with open('data/dates.ini', 'w+') as configfile:
             self.dates_config.write(configfile)
 
-    def read_dates_config(self):
+    def read_dates_config(self) -> Dict[str, Dict[str, str]]:
         self.dates_config.read('data/dates.ini')
-        return self.dates_config
+        return {s: dict(self.dates_config.items(s)) for s in self.dates_config.sections()}
 
 
 class ApplicationForm:
-    app_config = configparser.ConfigParser()
+    app_config: ConfigParser = ConfigParser()
 
     def __init__(self):
         self.app_config.read('urzad.conf')
@@ -98,7 +99,7 @@ class ApplicationForm:
 
 
 class UserApplication:
-    user_config = configparser.ConfigParser()
+    user_config: ConfigParser = ConfigParser()
 
     def __init__(self):
         self.user_config.read('data/user.ini')

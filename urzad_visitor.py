@@ -7,29 +7,32 @@ import smtplib
 import threading
 from email.mime.text import MIMEText
 from time import sleep, time
-from http.client import HTTPConnection
+from typing import Callable, Dict, List, TypeVar
 
-import AdvancedHTMLParser
-import pytesseract
+import AdvancedHTMLParser  # type: ignore
+import pytesseract  # type: ignore
 import requests
-import urllib3
-from PIL import Image
+import urllib3  # type: ignore
+from PIL import Image  # type: ignore
+from requests import Request, Response, Session
 
-import urzad
+from urzad import ApplicationForm, Urzad, UrzadLocation, UserApplication
 
 urllib3.disable_warnings()
-HTTPConnection.debuglevel = 1
+# from http.client import HTTPConnection
+# HTTPConnection.debuglevel = 1
 
 logging.config.fileConfig('logging.conf')  # , disable_existing_loggers=False
 
 logger = logging.getLogger('urzadVisitor')
 
 # Some global stuff :)
-lock = threading.RLock()
-locked_slots = []
+lock: threading.RLock = threading.RLock()
+locked_slots: List[str] = []
 
+T = TypeVar('T')
 
-def attempt(func, name, times=5):
+def attempt(func: Callable[[], T], name: str, times: int = 15) -> T:
     for n in range(times):
         try:
             logger.debug(f'{n+1} Attemt for "{name}"...')
@@ -40,8 +43,8 @@ def attempt(func, name, times=5):
     raise RuntimeError(f'Cannot exec function {name} for {times} times. Giving up...')
 
 
-def login_and_check(uv, session):
-    def check_is_logged_in(response):
+def login_and_check(uv: Urzad, session: Session):
+    def check_is_logged_in(response: Response):
         title = re.findall('<title>.*?</title>', response.text)[0]
         logger.debug(title)
         if 'Moje rezerwacje' not in title:
@@ -55,14 +58,14 @@ def login_and_check(uv, session):
     attempt(lambda: check_is_logged_in(session.post(uv.page_login, data=data, verify=False)), 'login_and_check')
 
 
-def parse_available_dates(uv, session):
-    def get_last_date_from_page(response):
+def parse_available_dates(urzad: Urzad, session: Session) -> Dict[str, Dict[str, str]]:
+    def get_last_date_from_page(response: Response) -> str:
         dates_found = re.findall('var dateEvents = \\[{.*?}\\]', response.text)[0][16:]
         dates_json = json.loads(dates_found)
         return dates_json[-1]['date']
 
     dates = {}
-    for ul in uv.user_urzad_locations:
+    for ul in urzad.user_urzad_locations:
         logger.debug(f'Parsing dates for location {ul.city_loc}: {ul.city_name}...')
 
         pol_dates_response = attempt(lambda: session.get(
@@ -77,19 +80,19 @@ def parse_available_dates(uv, session):
 
         dates['location_'+ul.city_loc] = {'city': ul.city_name, 'date': last_date}
 
-    uv.save_dates_config(dates)
+    urzad.save_dates_config(dates)
     logger.info('Parsing done. Config saved')
 
     return dates
 
 
-def try_book_available_slots(uv, session, dates=None):
+def try_book_available_slots(urzad: Urzad, session: Session, dates: Dict[str, Dict[str, str]] = None):
     start_time = time()
 
-    def time_is_over():
-        return time() - start_time >= uv.run_time
+    def time_is_over() -> bool:
+        return time() - start_time >= urzad.run_time
 
-    def get_available_slots(response, date):
+    def get_available_slots(response: Response, date: str) -> List[str]:
         parser = AdvancedHTMLParser.AdvancedHTMLParser()
         parser.parseStr(response.text)
         slots_found = [date + ' ' + a.text + ':00' for a in parser.getElementsByTagName('a') if a.id != 'confirmLink']
@@ -101,16 +104,16 @@ def try_book_available_slots(uv, session, dates=None):
         #     '12:00', '13:20', '13:40']]
         return slots_found
 
-    def lock_slot(session, ul, time):
+    def lock_slot(session: Session, ul: UrzadLocation, time: str):
         logger.debug(f'Going to lock slot {time} for {ul.city_loc}: {ul.city_name}...')
 
         lock.acquire()
-        logger.debug(f'>> lock_slot() locked by thread {threading.currentThread()}')
+        logger.debug(f'>> lock_slot() locked by thread {threading.current_thread()}')
 
         if not locked_slots:
             try:
                 response = session.post(
-                    uv.page_lock,
+                    urzad.page_lock,
                     cookies={'config[currentLoc]': ul.city_loc},
                     headers={'X-Requested-With': 'XMLHttpRequest'},
                     data={'time': time, 'queue': ul.city_queue},
@@ -122,18 +125,19 @@ def try_book_available_slots(uv, session, dates=None):
                     if slot not in locked_slots:
                         logger.info(f'A slot found: {slot}. Start filling the form...')
                         locked_slots.append(slot)
-                        fill_the_form(uv, ul, slot, time, session)
+                        fill_the_form(urzad, ul, slot, time, session)
                     else:
                         logger.info(f'A slot found: {slot} and was already locked by me. Check email!!!')
-            except Exception:
+            except Exception as err:
+                logger.error(f'Something wrong with locking slots: {err}')
                 pass
         else:
             logger.debug(f'Some slot is already locker. Passing by...')
 
-        logger.debug(f'>> lock_slot() released by thread {threading.currentThread()}')
+        logger.debug(f'>> lock_slot() released by thread {threading.current_thread()}')
         lock.release()
 
-    def search_slots(session, ul, date):
+    def search_slots(session: Session, ul: UrzadLocation, date: str):
         while not locked_slots and not time_is_over():
             sleep(1)  # TODO avoid brute force a bit ?
             logger.debug(f'Search available slots for {ul.city_loc}: {ul.city_name} and date {date}...')
@@ -158,10 +162,10 @@ def try_book_available_slots(uv, session, dates=None):
                 logger.debug(f'...joining {t}... ')
                 t.join()
 
-    dates_config = dates or uv.read_dates_config()
+    dates_config = dates or urzad.read_dates_config()
 
-    threads = []
-    for ul in uv.user_urzad_locations:
+    threads: List[threading.Thread] = []
+    for ul in urzad.user_urzad_locations:
         date = dates_config['location_'+ul.city_loc]['date']
 
         t = threading.Thread(target=lambda: search_slots(session, ul, date), name=f'TSlot-{ul.city_loc}-srch')
@@ -174,8 +178,8 @@ def try_book_available_slots(uv, session, dates=None):
         t.join()
 
 
-def fill_the_form(uv, ul, slot, time, session):
-    def solve_captcha(image_path):
+def fill_the_form(urzad: Urzad, ul: UrzadLocation, slot: str, time: str, session: Session):
+    def solve_captcha(image_path: str) -> str:
         initial_im = Image.open(image_path).convert('P')
         cleaned_im = Image.new('P', initial_im.size, 255)
 
@@ -190,7 +194,7 @@ def fill_the_form(uv, ul, slot, time, session):
     # 1. Get captcha
     logger.debug(f'Obtaining captcha...')
     captcha_response = attempt(lambda: session.get(
-        uv.page_captcha,
+        urzad.page_captcha,
         cookies={'config[currentLoc]': ul.city_loc},
         stream=True,
         verify=False
@@ -208,7 +212,7 @@ def fill_the_form(uv, ul, slot, time, session):
 
     # 2. Verify captcha
     captcha_check_response = attempt(lambda: session.post(
-        uv.page_captcha + '/check',
+        urzad.page_captcha + '/check',
         cookies={'config[currentLoc]': ul.city_loc},
         headers={'X-Requested-With': 'XMLHttpRequest'},
         data={'code': captcha_text},
@@ -223,7 +227,7 @@ def fill_the_form(uv, ul, slot, time, session):
     logger.info(f'Captcha solved, posting the user data...')
 
     # 3. Fill user form
-    user_data = prepare_user_data(uv)
+    user_data = prepare_user_data(urzad)
     fill_form_response = attempt(lambda: session.post(
         ul.page_slot.format(slot),
         cookies={'config[currentLoc]': ul.city_loc},
@@ -253,15 +257,15 @@ def fill_the_form(uv, ul, slot, time, session):
         locked_slots.clear()
         return
 
-    send_mail(uv, ul.city_name, time)
+    send_mail(urzad, ul.city_name, time)
 
 
-def prepare_user_data(uv):
+def prepare_user_data(urzad: Urzad) -> List[Dict[str, str]]:
 
-    def name_value(name, value):
+    def name_value(name: str, value: str) -> Dict[str, str]:
         return {'name': name, 'value': value}
 
-    def app_additional_text(app_form, a):
+    def app_additional_text(app_form: ApplicationForm, a: str):
         if a == 'spouse':
             return app_form.additional_spouse_text
         elif a == 'child':
@@ -271,8 +275,8 @@ def prepare_user_data(uv):
         else:
             pass
 
-    app_form = urzad.ApplicationForm()
-    user_app = urzad.UserApplication()
+    app_form = ApplicationForm()
+    user_app = UserApplication()
 
     if user_app.type == 'temporary':
         type_text = app_form.type_temporary_text
@@ -281,7 +285,7 @@ def prepare_user_data(uv):
     else:
         raise ValueError(f'Wrong type "{user_app.type}" specified')
 
-    user_data = [
+    user_data: List[Dict[str, str]] = [
         name_value(app_form.type, type_text),
         name_value(app_form.surname_name, user_app.surname_name),
         name_value(app_form.citizenship, user_app.citizenship),
@@ -304,9 +308,9 @@ def prepare_user_data(uv):
     return user_data
 
 
-def send_mail(uv, city, time):
-    gmail_user = uv.user_config['gmail']['email']
-    gmail_password = uv.user_config['gmail']['password']
+def send_mail(urzad: Urzad, city: str, time: str):
+    gmail_user = urzad.user_config['gmail']['email']
+    gmail_password = urzad.user_config['gmail']['password']
 
     sent_from = gmail_user
     to = [gmail_user]
@@ -332,7 +336,7 @@ def send_mail(uv, city, time):
 
 def main():
     with requests.Session() as session:
-        uv = urzad.Urzad()
+        uv = Urzad()
         session.headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:62.0) Gecko/20100101 Firefox/62.0'}
 
         # 1. visit main page (to set up cookies in the session)
