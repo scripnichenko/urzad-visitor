@@ -1,4 +1,4 @@
-FROM python:3-alpine
+FROM python:3.7-alpine
 LABEL Name=urzad-visitor Version=0.0.1
 
 RUN apk update && \

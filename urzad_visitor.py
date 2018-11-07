@@ -32,6 +32,7 @@ locked_slots: List[str] = []
 
 T = TypeVar('T')
 
+
 def attempt(func: Callable[[], T], name: str, times: int = 15) -> T:
     for n in range(times):
         try:
